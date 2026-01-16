@@ -255,24 +255,52 @@ with st.sidebar:
                 df_source = pd.read_csv(uploaded_file)
             else:
                 df_source = pd.read_excel(uploaded_file)
+            
+            # On lance le moteur de calcul
             _, df_source_clean = engine.audit_portefeuille(df_source)
+
             if 'Client' in df_source_clean.columns:
-                # ON TRIE PAR ARGENT (Du plus gros au plus petit)
-                clients_tries = df_source_clean.sort_values(by='Reste_A_Payer', ascending=False)['Client'].unique().tolist()
-                st.success(f"✅ {len(clients_tries)} Dossiers chargés")
+                # 1. ON TRIE TOUT LE MONDE PAR ARGENT (Du plus gros au plus petit)
+                df_source_clean = df_source_clean.sort_values(by='Reste_A_Payer', ascending=False)
                 
-                # On met à jour la variable pour la suite
-                clients_uniques = clients_tries
+                # 2. ON CRÉE UNE ÉTIQUETTE INTELLIGENTE (Icone + Montant + Nom)
+                # Cela permet de voir directement dans la liste qui est critique
+                def make_label(row):
+                    montant = row['Reste_A_Payer']
+                    nom = str(row['Client'])
+                    statut = row['Statut']
+                    
+                    icone = "✅"
+                    if statut == "🔴 CRITIQUE": icone = "🔴"
+                    elif statut == "⚠️ Retard Mineur": icone = "⚠️"
+                    
+                    return f"{icone} [{montant:,.0f}] {nom}"
+
+                df_source_clean['Select_Label'] = df_source_clean.apply(make_label, axis=1)
+                
+                # 3. LA LISTE CONTIENT TOUT LE MONDE (Pas de limite)
+                options_clients = df_source_clean['Select_Label'].tolist()
+                
+                st.success(f"✅ {len(options_clients)} Dossiers chargés & Classés")
             else:
                 st.error("Colonne 'Client' manquante")
-                clients_uniques = []
+                options_clients = []
         except Exception as e:
             st.error(f"Erreur Lecture: {e}")
-            clients_uniques = []
+            options_clients = []
 
         st.markdown("---")
-        st.markdown("### 🎯 ACTION")
-        client_selectionne = st.selectbox("Cible :", clients_uniques, index=None, placeholder="Chercher...", key="search")
+        st.markdown("### 🎯 CENTRE D'ACTION")
+        
+        # La liste affiche maintenant l'état et le montant AVANT le nom
+        selection_label = st.selectbox("Sélectionner un dossier :", options_clients, index=None, placeholder="Chercher un client...", key="search")
+        
+        client_selectionne = None
+        if selection_label:
+            # On retrouve le vrai nom du client à partir de l'étiquette sélectionnée
+            client_selectionne = df_source_clean[df_source_clean['Select_Label'] == selection_label].iloc[0]['Client']
+            
+        # La suite du code reste la même (if client_selectionne: ...)
         
         if client_selectionne:
             df_client = df_source_clean[df_source_clean['Client'] == client_selectionne]
@@ -386,3 +414,4 @@ else:
     with c2:
 
         st.markdown("""<div class="metric-card" style="text-align:center; padding:40px;"><div style="font-size: 50px;">🦅</div><h2 style="color:#1E293B;">KASHFLOW.AI</h2><p style="color:#64748B;">Base de données active.</p></div>""", unsafe_allow_html=True)
+
