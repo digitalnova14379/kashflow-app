@@ -257,8 +257,12 @@ with st.sidebar:
                 df_source = pd.read_excel(uploaded_file)
             _, df_source_clean = engine.audit_portefeuille(df_source)
             if 'Client' in df_source_clean.columns:
-                clients_uniques = sorted(df_source_clean['Client'].unique().tolist())
-                st.success(f"✅ {len(clients_uniques)} Dossiers")
+                # ON TRIE PAR ARGENT (Du plus gros au plus petit)
+                clients_tries = df_source_clean.sort_values(by='Reste_A_Payer', ascending=False)['Client'].unique().tolist()
+                st.success(f"✅ {len(clients_tries)} Dossiers chargés")
+                
+                # On met à jour la variable pour la suite
+                clients_uniques = clients_tries
             else:
                 st.error("Colonne 'Client' manquante")
                 clients_uniques = []
@@ -360,7 +364,9 @@ if uploaded_file and df_source is not None:
         st.markdown("<div style='height: 30px'></div>", unsafe_allow_html=True)
         st.markdown("### 📋 Tableau Global")
         st.dataframe(
-            df_traite[['Client', 'Date_Echeance', 'Reste_A_Payer', 'Jours_Retard', 'Statut']].style.background_gradient(cmap='Reds', subset=['Jours_Retard']),
+            df_traite[['Client', 'Date_Echeance', 'Reste_A_Payer', 'Jours_Retard', 'Statut']]
+            .sort_values(by='Reste_A_Payer', ascending=False)  # <--- LE TRI EST ICI
+            .style.background_gradient(cmap='Reds', subset=['Jours_Retard']),
             use_container_width=True,
             column_config={"Reste_A_Payer": st.column_config.NumberColumn("Montant", format="%d FCFA")}
         )
@@ -378,4 +384,5 @@ else:
     st.markdown("<div style='height: 100px'></div>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1,2,1])
     with c2:
+
         st.markdown("""<div class="metric-card" style="text-align:center; padding:40px;"><div style="font-size: 50px;">🦅</div><h2 style="color:#1E293B;">KASHFLOW.AI</h2><p style="color:#64748B;">Base de données active.</p></div>""", unsafe_allow_html=True)
